@@ -1,0 +1,30 @@
+unit ComDef;
+
+interface
+         
+uses SQLiteTable3;
+
+var
+  SQLiteDB: TSQLiteDatabase;
+
+const
+  TB_DIR_ITEMS    = 'dir_items';     TBID_DIR_ITEMS    = 1;
+  TB_PASTE_ITEMS  = 'paste_items';   TBID_PASTE_ITEMS  = 2;
+  TB_LAUNCH_ITEMS = 'launch_items';  TBID_LAUNCH_ITEMS = 3;
+  TB_BKMK_ITEMS   = 'bkmk_items';    TBID_BKMK_ITEMS   = 4;
+  TB_CLIP_ITEMS   = 'clip_items';    TBID_CLIP_ITEMS   = 5;
+
+
+
+
+  
+
+type
+  IItemOperations = interface
+    ['{801B7EEF-E901-468C-A3D5-008563F9CE98}']
+    procedure Excute;
+  end;
+
+implementation
+
+end.

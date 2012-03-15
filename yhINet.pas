@@ -1,0 +1,120 @@
+unit yhINet;
+
+interface   
+
+uses
+  Windows, Classes, Forms, SysUtils, WinInet, UrlMon;
+
+function GetHtml(URL: string; var Html: string): Boolean; 
+function DownloadFile(SourceFile, DestFile: string): Boolean; 
+function DownloadFileEx(SourceFile, DestFile: string): Boolean;
+
+implementation
+
+//=============================================================================
+//  ファイルをダウンロードする関数
+//  SourceFileで指定するファイルがないか，DestFile名が無効の場合はFalseを返す
+//  またネットワーク接続不可の場合もFalseを返す
+//  usesにUrlMonが必要
+//
+//  SourceFile : ダウンロードするファイルのURL
+//               このサンプルの場合は http://...  .lzh という文字列
+//               画像をダウンロードしたい場合は http://...  .gif 等
+//               ページのソースならば http://....  .html 等
+//  DestFile   : 保存先のフルパス名
+//               例えば C:\MyFolder\XXXX.lzh 等　
+//=============================================================================
+function DownloadFile(SourceFile, DestFile: string): Boolean;
+begin
+    try
+      Result:=UrlDownloadToFile(nil,PChar(SourceFile),PChar(DestFile),0,nil)=0;
+    except
+      Result:=False;
+    end;
+end;
+//=============================================================================
+//  インターネット上のファイルをディスクにダウンロード
+//  WinInetを使用する例(usesにWinInetが必要)
+//=============================================================================
+function DownloadFileEx(SourceFile, DestFile: string): Boolean;
+var
+     FS          : TFileStream;
+     hSession    : HINTERNET;
+     hService    : HINTERNET;
+     dwBytesRead : DWORD;
+     lpBuffer    : array[0..1023] of Char;
+begin
+     Result:= True;
+     hSession:=InternetOpen('MyApp', INTERNET_OPEN_TYPE_PRECONFIG,nil,nil,0);
+     if Assigned(hSession) then begin
+       hService := InternetOpenUrl(hSession,PChar(SourceFile),nil,0,0,0);
+       if Assigned( hService ) then begin
+         //上書き保存(なければ新規作成)
+         FS :=TFileStream.Create(DestFile,fmCreate);
+         try
+           dwBytesRead := 1024;
+           while True do begin
+             lpBuffer:=#0;
+             if InternetReadFile(hService,@lpBuffer,1024,dwBytesRead) then begin
+               //これがないと動作中にFormの移動などが不可となる
+               //Sleep(0)の0は適当0～10程度でいいようだ
+               Application.ProcessMessages;
+               Sleep(0);
+               if dwBytesRead=0 then break;
+               FS.WriteBuffer(lpBuffer,dwBytesRead);
+             end else begin
+               Result:=False;
+               Exit;;
+             end;
+           end;
+         finally
+           FreeAndNil(FS);
+         end;
+       end;
+     end else begin
+       Result:=False;
+     end;
+     InternetCloseHandle(hService);
+end;
+
+function GetHtml(URL: string; var Html: string): Boolean;
+var
+  hSession, hReqUrl :hInternet;
+  Buffer :array [0..1023] of Char;
+  ReadCount :Cardinal;
+  HtmlStr :string;
+begin
+  Result := False;
+  Html := '';
+  //接続の確立
+  hSession :=InternetOpen(nil, INTERNET_OPEN_TYPE_PRECONFIG,
+                          nil, nil, 0);
+  try
+  if Assigned(hSession) then
+  begin
+    //URLのハンドルを取得
+    hReqUrl :=InternetOpenUrl(hSession,PChar(URL),
+                              nil, 0,INTERNET_FLAG_RELOAD, 0);
+    try
+    if Assigned(hReqUrl) then
+    begin
+      while true do begin
+       //URLハンドルを元にBufferに読み込む(ファイル最後まで繰り返す)
+       InternetReadFile(hReqUrl, @Buffer, Sizeof(Buffer), ReadCount);
+       //ファイルの最後までいったら抜ける
+       if ReadCount = 0 then Break;
+       HtmlStr :=HtmlStr +string(Buffer);
+      end;
+      Html :=HtmlStr;
+      Result := True;
+    end;
+    finally
+      InternetCloseHandle(hReqUrl);
+    end;
+  end;
+  finally
+    InternetCloseHandle(hSession);
+  end;
+end;
+
+end.

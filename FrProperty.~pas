@@ -1,0 +1,929 @@
+unit FrProperty;
+
+interface
+
+uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
+  Buttons, ExtCtrls, ComCtrls, ShortcutKeyEdit, ComItems, Menus, ExtIniFile,
+  Dialogs, ChangeIconDialog, FrIcon, Grids, ComDef, Messages, yhFiles, ShellApi,
+  IconUtils, NkDIB, yhINet, SkRegExpW, IconEx, UntOption,
+  FrmShortcutAndHotKey, Dbg, FrmMouseAction, FrMemo, IconRes, FrMacro, Helper,
+  ImgList, NkDropTarget, NkTextDropTarget;
+
+const
+  clError = $00ECECFF;
+  WM_CHECKINPUT = WM_USER + 1;
+  WM_CHANGEFOCUS = WM_USER + 2;
+  
+type
+  TFormProperty = class(TForm)
+    OKBtn: TButton;
+    CancelBtn: TButton;
+    PageControl: TPageControl;
+    TabAll: TTabSheet;
+    TabAction: TTabSheet;
+    TabDir: TTabSheet;
+    ImageIcon: TImage;
+    Bevel1: TBevel;
+    EditName: TEdit;
+    MemoComment: TMemo;
+    ButtonClearUseCount: TButton;
+    EditTag: TEdit;
+    CheckBoxIsPassword: TCheckBox;
+    ButtonEditTag: TButton;
+    TabPaste: TTabSheet;
+    TabClip: TTabSheet;
+    TabLaunch: TTabSheet;
+    ComboViewStyle: TComboBox;
+    ComboSortMode: TComboBox;
+    MemoText: TMemo;
+    ComboPasteMode: TComboBoxEx;
+    LabelCreateDate: TLabel;
+    LabelUpdateDate: TLabel;
+    LabelAccessDate: TLabel;
+    LabelUseCount: TLabel;
+    LabelRepetition: TLabel;
+    ButtonEditor: TButton;
+    ButtonMacro: TButton;
+    EditFileName: TEdit;
+    ButtonFileName: TButton;
+    EditParams: TEdit;
+    EditDir: TEdit;
+    ComboShowCmd: TComboBox;
+    LabelDirInfo: TLabel;
+    TabBkmk: TTabSheet;
+    EditUrl: TEdit;
+    Label1: TLabel;
+    IconDialog: TChangeIconDialog;
+    RadioSortOrdAsc: TRadioButton;
+    RadioSortOrdDesc: TRadioButton;
+    CheckBoxIsAllLowerDir: TCheckBox;
+    LabelNameHint: TLabel;
+    OpenDialog: TOpenDialog;
+    SpeedButtonGetSiteInfo: TSpeedButton;
+    Image1: TImage;
+    FrameShortcutAndHotKey: TFrameShortcutAndHotKey;
+    FrameMouseAction: TFrameMouseAction;
+    ButtonDelDbShortcut: TButton;
+    ButtonDelDbHot: TButton;
+    ButtonDelDbMouse: TButton;
+    TextDropTargetName: TNkTextDropTarget;
+    TextDropTargetComment: TNkTextDropTarget;
+    TextDropTargetTag: TNkTextDropTarget;
+    TextDropTargetUrl: TNkTextDropTarget;
+    TextDropTargetText: TNkTextDropTarget;
+    LabelAddKeys: TLabel;
+    ButtonClearAddKeys: TButton;
+    EditAddKeys: TMemo;
+    procedure PageControlChange(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure LabelDirInfoClick(Sender: TObject);
+    procedure EditNameChange(Sender: TObject);
+    procedure ClearUseCount;
+    procedure ButtonClearUseCountClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure ImageIconClick(Sender: TObject);
+    procedure CheckEnabledMouse(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure EditNameDblClick(Sender: TObject);
+    procedure ButtonFileNameClick(Sender: TObject);
+    procedure SpeedButtonGetSiteInfoClick(Sender: TObject);
+    procedure ButtonEditorClick(Sender: TObject);
+    procedure FrameShortcutAndHotKeyEditShortcutKeyChange(Sender: TObject);
+    procedure FrameShortcutAndHotKeyEditHotKeyChange(Sender: TObject);
+    procedure ButtonEditTagClick(Sender: TObject);
+    procedure ButtonMacroClick(Sender: TObject);
+    procedure ButtonDelDbShortcutClick(Sender: TObject);
+    procedure ButtonDelDbHotClick(Sender: TObject);
+    procedure ButtonDelDbMouseClick(Sender: TObject);
+    procedure TextDropTargetNameTextDrop(Text: String);
+    procedure TextDropTargetCommentTextDrop(Text: String);
+    procedure TextDropTargetUrlTextDrop(Text: String);
+    procedure TextDropTargetTagTextDrop(Text: String);
+    procedure TextDropTargetTextTextDrop(Text: String);
+    procedure EditAddKeysKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure ButtonClearAddKeysClick(Sender: TObject);
+  private
+    { Private 宣言 }
+    ImageIndex: Integer;
+    procedure SetCompoParent;
+    procedure Initialize;
+    procedure ErrorMessage(Msg: string);
+    procedure CheckNonText(Edit: TEdit; Msg: string);
+    function CheckInput: Boolean;
+    function MakeTempFile: string;
+  protected
+    procedure WMCheckInput(var Message: TMessage); message WM_CHECKINPUT;  
+    procedure WMChangeFocus(var Message: TMessage); message WM_CHANGEFOCUS;
+  public
+    { Public 宣言 }
+    IconPath: string;
+    IconIndex: Integer;
+    ListIcons: TIconList;
+//    ImageListS, ImageListL: TImageList;
+    ItemEditMode: TItemEditMode;
+    IsNew: Boolean;
+    EditingItem: TCommonItem;
+    slError: TStringList;
+    procedure SaveToItem(Item: TCommonItem);
+    procedure LoadFromItem(Item: TCommonItem);
+    procedure ReadIni(Ini: TExtIniFile);
+    procedure WriteIni(Ini: TExtIniFile);
+    procedure SetTabVisible(Tab: TTabSheet);
+  end;
+
+var
+  FormProperty: TFormProperty;
+
+implementation
+
+{$R *.dfm}
+
+uses FrMain;
+
+procedure TFormProperty.Initialize;
+begin
+  EditingItem := nil;
+  ItemEditMode := iemDir;
+  //TabAll
+  LabelNameHint.Caption := '';
+  EditName.Clear;
+  MemoComment.Clear;
+  EditTag.Clear;
+  LabelCreateDate.Caption := '---';
+  LabelUpdateDate.Caption := '---';
+  LabelAccessDate.Caption := '---';
+  ClearUseCount;
+  CheckBoxIsPassword.Checked := False;
+  ImageIndex := 0;
+  //TabDir
+  ComboViewStyle.ItemIndex := Integer(vsIcon);
+  ComboSortMode.ItemIndex := Integer(smUser);
+
+  //TabPaste
+  MemoText.Clear;
+  ComboPasteMode.ItemIndex := Integer(pmPaste);
+
+  //IconHave
+  IconPath := '';
+  IconIndex := -1;
+
+  //TabBkmk
+  EditUrl.Clear;
+
+  //TabLaunch
+  EditFileName.Clear;
+  EditParams.Clear;
+  EditDir.Clear;
+  ComboShowCmd.ItemIndex := Integer(scShow);
+end;
+
+procedure TFormProperty.FormCreate(Sender: TObject);
+begin
+  slError := TStringList.Create;
+  Initialize;
+  SetCompoParent;
+  FrameMouseAction.EnabledMouseSettings;
+  PostMessage(Handle, WM_CHECKINPUT, 0, 0);
+  EditAddKeys.Text := '';
+end;
+
+procedure TFormProperty.PageControlChange(Sender: TObject);
+begin
+  SetCompoParent;
+end;
+
+procedure TFormProperty.SetCompoParent;
+var Tab: TTabSheet;
+begin
+  Tab := PageControl.ActivePage;
+  ImageIcon.Parent := Tab;
+  EditName.Parent := Tab;
+  LabelNameHint.Parent := Tab;
+  EditName.TabOrder := 0;
+//  TextDropTargetName.Window := nil;
+//  TextDropTargetName.Free;
+//  TextDropTargetName := TNkTextDropTarget.Create(Self);
+//  if TextDropTargetName.Window <> EditName then
+//  TextDropTargetName.Window := EditName;
+  Bevel1.Parent := Tab;
+  CheckBoxIsAllLowerDir.Visible := (ItemEditMode = iemDir) and
+    (PageControl.ActivePage <> TabAction) and (OKBtn.Caption = 'OK');
+  if Visible then
+    if (PageControl.ActivePage = TabPaste) or (PageControl.ActivePage = TabClip) then
+      PostMessage(Handle, WM_CHANGEFOCUS, 0, LPARAM(MemoText))
+//      MemoText.SetFocus
+    else if (PageControl.ActivePage = TabLaunch) then   
+      PostMessage(Handle, WM_CHANGEFOCUS, 0, LPARAM(EditFileName))
+//      EditFileName.SetFocus
+    else if (PageControl.ActivePage = TabBkmk) then 
+      PostMessage(Handle, WM_CHANGEFOCUS, 0, LPARAM(EditUrl))
+//      EditUrl.SetFocus
+    else if EditName.Visible then
+      PostMessage(Handle, WM_CHANGEFOCUS, 0, LPARAM(EditName));
+//      EditName.SetFocus;
+end;
+
+procedure TFormProperty.LabelDirInfoClick(Sender: TObject);
+begin
+  PageControl.ActivePage := TabAll;
+  SetCompoParent;
+end;
+
+procedure TFormProperty.ErrorMessage(Msg: string);
+begin
+
+end;
+
+procedure TFormProperty.CheckNonText(Edit: TEdit; Msg: string);
+begin
+  if Edit.Text = '' then begin
+    Edit.Color := clError;
+    ErrorMessage(Msg);
+    OKBtn.Enabled := False;
+  end else begin
+    Edit.Color := clWindow;
+//    LabelHint.Caption := '';
+    OKBtn.Enabled := True;
+  end;
+end;
+
+procedure TFormProperty.EditNameChange(Sender: TObject);
+var IsPasteMode: Boolean;
+begin
+  if Visible then CheckInput;
+  IsPasteMode := TPasteMode(ComboPasteMode.ItemIndex) = pmPaste;
+  LabelAddKeys.Visible := IsPasteMode;  
+  EditAddKeys.Visible := IsPasteMode;
+  ButtonClearAddKeys.Visible := IsPasteMode;
+
+  if ComboPasteMode.ItemIndex = -1 then Exit;
+  if not IsNew then Exit;
+  if ItemEditMode <> iemPaste then Exit;
+  ImageIcon.Picture.Icon.Assign(TIconItem(PasteIcons[ComboPasteMode.ItemIndex]).Icon);
+end;
+
+procedure TFormProperty.LoadFromItem(Item: TCommonItem);
+begin
+  EditingItem := Item;
+
+  EditName.Text := Item.Name;
+  ImageIcon.Picture.Icon := (Item.IconItem.Icon);
+  if ItemEditMode in [iemPaste, iemClip] then
+  ImageIndex := Item.IconItem.Index;
+  MemoComment.Text := Item.Comment;
+  EditTag.Text := Item.Tags.CommaText;
+  LabelCreateDate.Caption := FormatPropDate(Item.CreateDate);
+  LabelUpdateDate.Caption := FormatPropDate(Item.UpdateDate);
+  LabelAccessDate.Caption := FormatPropDate(Item.AccessDate);
+  LabelUseCount.Caption := IntToStr(Item.UseCount);
+  LabelRepetition.Caption := Item.RepetitionStr;
+  CheckBoxIsPassword.Checked := Item.IsPassword;
+  FrameShortcutAndHotKey.SetKeys(Item.ShortcutKey.Key, Item.HotKey.Key);
+//  EditShortcutKey.Text := ShortCutToText(Item.ShortcutKey.Key);
+//  EditHotKey.Text := ShortCutToText(Item.HotKey.Key);
+
+  FrameMouseAction.SetMouses(Item.Mouse);
+
+//  RadioGroupMouseDspPos.ItemIndex := Integer(Item.Mouse.DspPos);
+
+  if Item is TDirItem then begin
+    ComboViewStyle.ItemIndex := Integer((Item as TDirItem).ViewStyle);
+    ComboSortMode.ItemIndex  := Integer((Item as TDirItem).SortMode);
+    RadioSortOrdAsc.Checked  :=  (Item as TDirItem).SortOrdAsc;
+    RadioSortOrdDesc.Checked := not (Item as TDirItem).SortOrdAsc;
+  end;
+  if (Item is TPasteItem) or (Item is TClipItem) then begin
+    MemoText.Text := (Item as TTextItem).Text;
+    ComboPasteMode.ItemIndex := Integer((Item as TTextItem).Mode);
+  end;            
+  if Item is TBkmkItem then begin
+    EditUrl.Text := (Item as TBkmkItem).Url;
+  end;
+  if Item is TLaunchItem then begin
+    EditFileName.Text := (Item as TLaunchItem).FileName;
+    EditParams.Text :=   (Item as TLaunchItem).Params;
+    EditDir.Text :=      (Item as TLaunchItem).Dir;
+    ComboShowCmd.ItemIndex := Integer((Item as TLaunchItem).ShowCmd);
+  end;
+end;
+
+procedure TFormProperty.SaveToItem(Item: TCommonItem);
+var sk, hk: TShortCut;
+begin
+  Item.Name := EditName.Text;
+  Item.Comment := MemoComment.Text;
+  Item.Tags.CommaText := EditTag.Text;
+  if LabelUseCount.Caption = '0' then Item.ClearUseCount;
+  Item.IsPassword := CheckBoxIsPassword.Checked;
+  FrameShortcutAndHotKey.GetKeys(sk, hk);
+  Item.ShortcutKey.Key := sk;
+  Item.HotKey.Key := hk;
+//  Item.ShortcutKey.Key := TextToShortCut(EditShortcutKey.Text);
+//  Item.HotKey.Key := TextToShortCut(EditHotKey.Text);
+
+  FrameMouseAction.GetMouses(Item.Mouse);
+
+  if (Item is TPasteItem) or (Item is TClipItem) or (Item is TDirItem) then
+    Item.IconItem := TIconItem(ListIcons[ImageIndex])
+  else begin
+    Item.IconItem.Icon.Assign(ImageIcon.Picture.Icon);
+//    dib := TNkDIB.Create;
+//    bmp := TBitmap.Create;
+//    try
+//      dib.Width := 32; dib.Height := 32;
+//      bmp.Height := 32; bmp.Width := 32;
+//      bmp.Canvas.Draw(0, 0, ImageIcon.Picture.Icon);
+//      dib.Assign(bmp);
+//      fn := TmpPath + FormatDateTime('yyyymmddhhnnsszzz".ico"', Now);
+//      SaveIcon(dib, fn);
+//
+//      Item.IconItem.Icon.LoadFromFile(fn);
+//    finally
+//      if FileExists(fn) then
+//        DeleteFile(fn);
+//      bmp.Free;
+//      dib.Free;
+//    end;
+//    if IsNew then
+//      Item.IconItem.Insert
+//    else Item.IconItem.Update;
+  end;
+
+  if Item is TDirItem then begin
+    (Item as TDirItem).ViewStyle := TViewStyle(ComboViewStyle.ItemIndex);
+    (Item as TDirItem).SortMode  := TSortMode(ComboSortMode.ItemIndex);
+    (Item as TDirItem).SortOrdAsc  := RadioSortOrdAsc.Checked = True;
+  end;
+  if (Item is TPasteItem) or (Item is TClipItem) then begin
+    (Item as TTextItem).Text := MemoText.Text;
+    (Item as TTextItem).Mode := TPasteMode(ComboPasteMode.ItemIndex);
+    if Trim((Item as TTextItem).Name) = '' then
+      (Item as TTextItem).Name := GetAvailablenessLine(MemoText.Text);
+  end;
+  if Item is TBkmkItem then begin
+    (Item as TBkmkItem).Url := EditUrl.Text;
+  end;
+  if Item is TLaunchItem then begin
+    (Item as TLaunchItem).FileName := EditFileName.Text;
+    (Item as TLaunchItem).Params   := EditParams.Text;
+    (Item as TLaunchItem).Dir      := EditDir.Text;
+    (Item as TLaunchItem).ShowCmd  := TShowCmd(ComboShowCmd.ItemIndex);
+  end;
+end;
+
+procedure TFormProperty.ClearUseCount;
+begin
+  LabelUseCount.Caption := '0';
+  LabelRepetition.Caption := '0.00';
+end;
+
+procedure TFormProperty.ButtonClearUseCountClick(Sender: TObject);
+begin
+  ClearUseCount;
+end;
+
+procedure TFormProperty.ReadIni(Ini: TExtIniFile);
+begin
+  with Ini do begin
+    ReadForm(Self.Name, 'Form', Self);
+//    if IsNew then
+//      RadioGroupMouseDspPos.ItemIndex :=
+//        ReadInt(Self.Name, 'MouseDspPos', Integer(mdpMouseCursol));
+    if CheckBoxIsAllLowerDir.Visible then
+      CheckBoxIsAllLowerDir.Checked := ReadBool(Self.Name, 'IsAllLowerDir', False);
+//    PageControl.ActivePageIndex := ReadInt(Self.Name, 'PageControl.ActivePageIndex', 0);
+  end;
+end;
+
+procedure TFormProperty.WriteIni(Ini: TExtIniFile);
+begin
+  with Ini do begin
+    WriteForm(Self.Name, 'Form', Self);
+//    if IsNew then
+//      WriteInt(Self.Name, 'MouseDspPos', RadioGroupMouseDspPos.ItemIndex);
+    if CheckBoxIsAllLowerDir.Visible then
+      WriteBool(Self.Name, 'IsAllLowerDir', CheckBoxIsAllLowerDir.Checked);
+    Update;
+//    WriteInt(Self.Name, 'PageControl.ActivePageIndex', PageControl.ActivePageIndex);
+  end;
+end;
+
+procedure TFormProperty.SetTabVisible(Tab: TTabSheet);
+//var IsVisible: Boolean;
+begin
+  TabDir.Visible := Tab = TabDir;
+  TabDir.TabVisible := Tab = TabDir;
+  TabPaste.Visible := Tab = TabPaste;
+  TabPaste.TabVisible := Tab = TabPaste;
+  TabClip.Visible := Tab = TabClip;
+  TabClip.TabVisible := Tab = TabClip;
+  TabLaunch.Visible := Tab = TabLaunch;
+  TabLaunch.TabVisible := Tab = TabLaunch;
+  TabBkmk.Visible := Tab = TabBkmk;
+  TabBkmk.TabVisible := Tab = TabBkmk;
+  PageControl.ActivePage := Tab;
+  SetCompoParent;
+end;
+
+procedure TFormProperty.FormActivate(Sender: TObject);
+begin
+  SetCompoParent;
+end;
+
+procedure TFormProperty.ImageIconClick(Sender: TObject);
+var Icon: TIcon;
+begin
+  if (ItemEditMode = iemDir) or (ItemEditMode = iemPaste) or (ItemEditMode = iemClip) then begin
+    FormIcon := TFormIcon.Create(Self);
+    try
+//      FormIcon.ImageListS := ImageListS;
+//      FormIcon.ImageListL := ImageListL;
+      FormIcon.ItemEditMode := ItemEditMode;
+      FormIcon.ListIcons := ListIcons;
+      FormIcon.ImageIndex := ImageIndex;
+      if FormIcon.ShowModal = mrOk then begin
+        ImageIndex := FormIcon.IconGrid.Index;
+      end;                                                           
+      ImageIcon.Picture.Icon := TIconItem(ListIcons[ImageIndex]).Icon;
+    finally
+      FormIcon.Release;
+    end;
+  end else begin
+//    if FileExists(EditFileName.Text) then
+//      IconDialog.FileName := EditFileName.Text;
+    if IconDialog.Execute then begin
+      Icon := TIcon.Create;
+      try
+        SaveIcons(ExpandPath(IconDialog.FileName), IconDialog.IconIndex, Icon);
+        if Icon.Empty then begin
+          MessageDlg('有効なアイコンが選択されなかったので変更をキャンセルします。',
+            mtWarning, [mbOK], 0);
+          Exit;
+        end;
+        IconPath := IconDialog.FileName;
+        IconIndex := IconDialog.IconIndex;
+        ImageIcon.Picture.Icon.Assign(Icon);
+      finally
+        Icon.Free;
+      end;
+
+    end;
+  end;
+end;
+
+procedure TFormProperty.CheckEnabledMouse(Sender: TObject);
+begin
+  FrameMouseAction.EnabledMouseSettings;     
+  if Visible then CheckInput;
+end;
+
+procedure TFormProperty.FormDestroy(Sender: TObject);
+begin
+  slError.Free;
+  CloseHintWindow;
+end;
+
+function TFormProperty.CheckInput: Boolean;
+var IsMacro, res: Boolean; id: Int64;
+begin
+  Result := True;
+  slError.Clear;
+  IsMacro := ComboPasteMode.ItemIndex = Integer(pmKeyMacro);
+  ButtonMacro.Visible := IsMacro;
+  ButtonEditor.Enabled := not IsMacro;
+  MemoText.ReadOnly := IsMacro;
+  if IsMacro then MemoText.Color := clBtnFace
+  else MemoText.Color := clWindow;  
+  case ItemEditMode of
+    iemPaste, iemClip: LabelNameHint.Caption :=
+        '入力しない場合は、テキストを元に自動で名前が付けられます';
+    iemLaunch: LabelNameHint.Caption :=
+        '入力しない場合は、ファイルを元に自動で名前が付けられます';  
+    iemBkmk: LabelNameHint.Caption :=
+        '入力しない場合は、URLを元に自動で名前が付けられます';
+    else LabelNameHint.Caption := '';
+  end;
+
+//  if (Trim(EditName.Text) = '') and (ItemEditMode <> iemPaste)
+//      and (ItemEditMode <> iemClip) then begin
+//    Result := False;
+//    slError.Add('アイテム名を入力してください。');
+//  end;
+
+  if (TabPaste.TabVisible or TabClip.TabVisible)
+    and (Trim(MemoText.Text) = '') then begin
+    Result := False;
+    slError.Add('テキストを入力してください。');
+  end;
+
+  if (Trim(EditName.Text) = '') and (ItemEditMode = iemBkmk) then begin
+    Result := False;
+    slError.Add('アイテム名を入力してください。' +
+      'URLを入力して[ サイト情報取得 ]ボタンを押すとWEBからサイト情報を取得します。');
+  end;
+
+  if TabBkmk.TabVisible and (Trim(EditUrl.Text) = '') then begin
+    Result := False;         
+    SpeedButtonGetSiteInfo.Enabled := False;
+    slError.Add('URLを入力してください。');
+  end;
+
+  if TabBkmk.TabVisible and (Trim(EditUrl.Text) <> '')
+     and (not IsUrl(EditUrl.Text))  then begin
+    Result := False;          
+    SpeedButtonGetSiteInfo.Enabled := False;
+    slError.Add('URLが不正です。');
+  end;
+
+  if IsUrl(EditUrl.Text) then SpeedButtonGetSiteInfo.Enabled := True;
+
+  if TabLaunch.TabVisible and (Trim(EditFileName.Text) = '') then begin
+    Result := False;
+    slError.Add('「参照」からファイル名を入力してください。');
+  end;
+         
+  if TabLaunch.TabVisible and (Trim(EditFileName.Text) <> '')
+     and (not IsFileName(EditFileName.Text)) then begin
+    Result := False;
+    slError.Add('ファイル名が不正です。');
+  end;
+
+//  if TabLaunch.TabVisible and (Trim(EditFileName.Text) <> '')
+//     and (not FileExists(EditFileName.Text)) then begin
+//    Result := False;
+//    slError.Add('存在しないファイル名です。');
+//  end;
+
+  //ショートカット
+  if Assigned(EditingItem) and ExistActionShortCut(FormStancher.ActionList,
+      TextToShortCut(FrameShortcutAndHotKey.EditShortcutKey.Text)) then begin
+    Result := False;
+    slError.Add('入力されたショートカットキー( ' +
+        FrameShortcutAndHotKey.EditShortcutKey.Text + ' )' +
+        'は既にコマンドメニューに登録されています。' +
+        'コマンドメニューのショートカットキーは変更できないので入力を変更してください。');
+  end;
+  if Assigned(EditingItem) then begin
+    id := EditingItem.ShortcutKey.ID;
+    if id = 0 then raise Exception.Create('Item.ShortcutKey.ID Error');
+  end else id := 0;
+  res := KeyExsist(TShortcutKeyItem, id,
+      FrameShortcutAndHotKey.EditShortcutKey.Text);
+  ButtonDelDbShortcut.Enabled := res;
+  if res then begin
+    Result := False;
+    slError.Add('入力されたショートカットキー( ' +
+        FrameShortcutAndHotKey.EditShortcutKey.Text + ' )は既に登録されています。');
+  end;
+              
+  if Assigned(EditingItem) then begin
+    id := EditingItem.HotKey.ID;
+    if id = 0 then raise Exception.Create('Item.HotKey.ID Error');
+  end else id := 0;
+  res := KeyExsist(THotKeyItem, id,
+      FrameShortcutAndHotKey.EditHotKey.Text);
+  ButtonDelDbHot.Enabled := res;
+  if res then begin
+    Result := False;
+    slError.Add('入力されたホットキー( ' +
+        FrameShortcutAndHotKey.EditHotKey.Text + ' )は既に登録されています。');
+  end;
+
+
+  if FrameMouseAction.CheckBoxMouseEnabled.Checked then begin
+    if FrameMouseAction.CheckBoxMouseEnabled.Checked and
+      FrameMouseAction.EmptyMouseValue(FrameMouseAction.GroupBoxMouseRtnPoses) then begin
+      Result := False;
+      slError.Add(FrameMouseAction.GroupBoxMouseRtnPoses.Caption + 'のどれか一つを選択してください。');
+    end;
+
+    if Assigned(EditingItem) then begin
+      id := EditingItem.Mouse.ID;
+      if id = 0 then raise Exception.Create('Item.Mouse.ID Error');
+    end else
+      id := 0;
+    res := MouseItemExist(id, True, TMouseAction(FrameMouseAction.RadioGroupMouseAction.ItemIndex),
+      FrameMouseAction.GetMouseKeyFlags, FrameMouseAction.GetMouseRtnPoses);
+    ButtonDelDbMouse.Enabled := res;
+    if res then begin
+      Result := False;
+      slError.Add('" ' + FrameMouseAction.LabelMouseHint.Caption +
+        ' "のアクションは既に登録されています。他のアクションを選択してください。');
+    end;
+  end;
+//  ShowMessage(slError.Text);
+
+  CloseHintWindow;
+  if Result then begin
+  end else begin
+//    Application.ProcessMessages;
+    ShowHintWindow(Self, slError.Text);
+  end;
+  OKBtn.Enabled := Result;
+end;
+
+procedure TFormProperty.FormPaint(Sender: TObject);
+begin
+//  case ItemEditMode of
+//    iemPaste, iemClip: begin
+//      with EditName.c do begin
+//
+//      end;
+//    end;
+//  end;
+end;
+
+procedure TFormProperty.EditNameDblClick(Sender: TObject);
+begin
+  TEdit(Sender).SelectAll;
+end;
+
+procedure TFormProperty.ButtonFileNameClick(Sender: TObject);
+var fn, pn, fd, cn, ext, tag: string; Icon: TIcon;
+  fi: TFileInfo;  lfi :TLinkFileInfo;
+begin
+  if OpenDialog.Execute then begin
+    fn := OpenDialog.FileName; 
+    if not FileExists(fn) then Exit;
+    EditFileName.Text := fn;
+    fi := TFileInfo.Create;
+    fi.FileName := fn;    
+    ext := LowerCase(ExtractFileExt(fn));
+
+    if ext = '.lnk' then begin
+      lfi := GetInfofromLinkFile(fn);
+      fn := lfi.Filename;
+      EditDir.Text := lfi.WorkDir;
+      EditParams.Text := lfi.Arguments;
+      case lfi.ShowCmd of
+        SW_MINIMIZE, SW_SHOWMINIMIZED, SW_SHOWMINNOACTIVE:
+          ComboShowCmd.ItemIndex := Integer(scMin);
+        SW_MAXIMIZE: ComboShowCmd.ItemIndex := Integer(scMax);
+        else ComboShowCmd.ItemIndex := Integer(scShow);
+      end;
+    end;
+
+    EditName.Text := ExtractFileNameOnly(fn);
+    MemoComment.Text := ExtractFileName(fn);
+    EditDir.Text := ExtractFileDir(fn);
+
+    pn := fi.ProductName;
+    fd := fi.FileDescription;
+    cn := fi.CompanyName;
+    tag := MakeLaunchTag(pn, cn);
+    if Trim(pn) <> '' then EditName.Text := pn;
+    if Trim(tag) <> '' then EditTag.Text := tag;
+    if Trim(fd) <> '' then
+      MemoComment.Text := MemoComment.Text + #13#10 + fd;
+
+    Icon := TIcon.Create;
+    try
+      ExtractFileIcon(fn, Icon);
+      ImageIcon.Picture.Icon.Assign(Icon);
+    finally
+      Icon.Free;
+    end;
+//    ExtractFileIcon(fn, ImageIcon.Picture.Icon);
+//    ImageIcon.Picture.Icon.Handle := ExtractIconEx(fn);
+//    pi(sizeof(ImageIcon.Picture.Icon.));
+
+    ImageIcon.OnClick := ImageIconClick;
+    ImageIcon.Cursor := crHandPoint; 
+    fi.Free;
+  end;
+end;
+
+procedure TFormProperty.WMCheckInput(var Message: TMessage);
+begin
+  CheckInput;
+end;
+
+procedure TFormProperty.SpeedButtonGetSiteInfoClick(Sender: TObject);
+var wsi: TWebSiteInfo; //fn: string; ico: TIconEx; dib: TNkDIB; bmp: TBitmap;
+begin
+  if GetWebSiteInfo(EditUrl.Text, wsi) then begin
+    Screen.Cursor := crHourGlass;
+    try
+      with wsi do begin
+        if EditName.Text = '' then EditName.Text := Title;
+        if MemoComment.Text = '' then MemoComment.Text := Description;
+        if EditTag.Text = '' then EditTag.Text := Keywords;
+        if EditName.Text = '' then EditName.Text := Title;
+        GetWebSiteIcon(IconUrl, ImageIcon.Picture.Icon);
+//        DOutI(ImageIcon.Picture.Icon.Width);
+
+//        fn := TmpPath + FormatDateTime('yyyymmddhhnnsszzz".ico"', Now);
+//        if DownloadFileEx(IconUrl, fn) then begin
+//          bmp := TBitmap.Create;
+//          dib := TNkDIB.Create;
+//          ico := TIconEx.Create;
+//          try
+//            ico.LoadFromFile(fn);
+//            bmp.Width := 32;
+//            bmp.Height := 32;
+//            bmp.Canvas.Draw(0, 0, ico);
+//            dib.Assign(bmp);
+//            SaveIcon(dib, fn);
+//            ImageIcon.Picture.LoadFromFile(fn);
+//            DeleteFile(fn);
+//          finally
+//            ico.Free;
+//            dib.Free;
+//            bmp.Free;
+//          end;
+//        end;
+      end;
+    finally
+      Screen.Cursor := crDefault;
+    end;
+
+  end else begin
+    MessageDlg('サイト情報の取得に失敗しました。', mtInformation, [mbOK], 0);
+  end;
+end;
+
+procedure TFormProperty.ButtonEditorClick(Sender: TObject);
+var TmpFile, edt, TmpCaption: string;
+begin
+  Enabled := False;
+  TmpCaption := Caption;
+  try
+    edt := FormStancher.Option.EditorPath;
+    if (edt <> 'notepad.exe') and (not FileExists(edt)) then begin
+      Msg('外部エディタファイルが存在しません。' + #13#10 +
+      '｢オプション」→「パス」から外部エディタのアドレスを設定仕直してください。');
+      Exit;
+    end;
+    Caption := '外部エディタで編集中...';
+    MemoText.Color := clBtnFace;
+    ShowHintWindow(Self, '外部エディタで編集中です。');
+    TmpFile := MakeTempFile;
+    try
+      if Open(Handle, edt, '"' + TmpFile + '"', True, True) then begin
+        MemoText.Lines.LoadFromFile(TmpFile);
+      end;
+    finally
+      DeleteFile(TmpFile);
+    end;
+  finally
+    MemoText.Color := clWindow;
+    Caption := TmpCaption;
+    Enabled := True;
+    CheckInput;
+  end;
+end;
+
+function TFormProperty.MakeTempFile: string;
+var
+  fname, title: string;
+begin
+  title := FormatDateTime('yyyymmddhhnnsszzz', Now);
+  fname := NotErrorFileName(title);
+  fname := TmpPath + fname + '.txt';
+  Result := fname;
+  MemoText.Lines.SaveToFile(fname);
+  while not FileExists(fname) do Application.ProcessMessages;
+end;
+
+procedure TFormProperty.FrameShortcutAndHotKeyEditShortcutKeyChange(
+  Sender: TObject);
+begin
+  if Visible then CheckInput;
+end;
+
+procedure TFormProperty.FrameShortcutAndHotKeyEditHotKeyChange(
+  Sender: TObject);
+begin
+  if Visible then CheckInput;
+end;
+
+procedure TFormProperty.ButtonEditTagClick(Sender: TObject);
+var i: Integer; s: string;
+begin
+  FormMemo := TFormMemo.Create(Self);
+  try
+    with FormMemo do begin
+      Caption := 'タグの入力';
+      LabelMsg.Caption := '改行区切りでタグを入力し手ください。';
+      Memo.Lines.CommaText := EditTag.Text;
+      if ShowModal = mrOK then begin
+        for i := Memo.Lines.Count-1 downto 0 do begin
+          s := Trim(Memo.Lines[i]);
+          Memo.Lines[i] := s;
+          if s = '' then Memo.Lines.Delete(i);
+        end;
+        EditTag.Text := Memo.Lines.CommaText;
+      end;
+    end;
+  finally
+    FormMemo.Release;
+  end;
+end;
+
+
+procedure TFormProperty.WMChangeFocus(var Message: TMessage);
+begin
+  if TControl(Message.LParam) = nil then Exit;
+  SetForegroundWindow(Handle);
+  TWinControl(Message.LParam).SetFocus;
+end;
+
+procedure TFormProperty.ButtonMacroClick(Sender: TObject);
+begin
+  FormMacro := TFormMacro.Create(Self);
+  try
+    if FormMacro.ShowModal = mrOK then begin
+      MemoText.Text := FormMacro.MemoData.Text;
+    end;
+  finally
+    FormMacro.Free;
+  end;
+end;
+
+procedure TFormProperty.ButtonDelDbShortcutClick(Sender: TObject);
+var id, res: Int64;
+begin
+  if FormStancher.Option.ConfDelDbShortcut and
+    (MessageDlg('あらかじめ登録されている重複ショートカットキーを削除しますか？',
+      mtConfirmation, [mbYes, mbNo], 0) = mrNo) then Exit;
+  if Assigned(EditingItem) then id := EditingItem.ShortcutKey.ID
+  else id := 0;
+  res := DeleteKey(TShortcutKeyItem, id,
+      FrameShortcutAndHotKey.EditShortcutKey.Text);
+  FormStancher.DeleteDirKey(res, True);
+  CheckInput;
+end;
+
+procedure TFormProperty.ButtonDelDbHotClick(Sender: TObject);
+var id, res: Int64;
+begin
+  if FormStancher.Option.ConfDelDbHot and
+    (MessageDlg('あらかじめ登録されている重複ホットキーを削除しますか？',
+      mtConfirmation, [mbYes, mbNo], 0) = mrNo) then Exit;
+  if Assigned(EditingItem) then id := EditingItem.HotKey.ID
+  else id := 0;
+  res := DeleteKey(THotKeyItem, id,
+      FrameShortcutAndHotKey.EditHotKey.Text);
+  FormStancher.DeleteDirKey(res, False);
+  CheckInput;
+end;
+
+procedure TFormProperty.ButtonDelDbMouseClick(Sender: TObject);
+var id, res: Int64;
+begin                
+  if FormStancher.Option.ConfDelDbMouse and
+    (MessageDlg('あらかじめ登録されている重複マウスアクションを削除しますか？',
+      mtConfirmation, [mbYes, mbNo], 0) = mrNo) then Exit;
+  if Assigned(EditingItem) then id := EditingItem.Mouse.ID
+  else id := 0;
+  res := DeleteMouseKey(id, True, TMouseAction(FrameMouseAction.RadioGroupMouseAction.ItemIndex),
+      FrameMouseAction.GetMouseKeyFlags, FrameMouseAction.GetMouseRtnPoses);
+  FormStancher.DeleteDirMouseAction(res);
+  CheckInput;
+end;
+
+procedure TFormProperty.TextDropTargetNameTextDrop(Text: String);
+begin
+  EditName.Text := Text;
+end;
+
+procedure TFormProperty.TextDropTargetCommentTextDrop(Text: String);
+begin
+  MemoComment.Text := Text;
+end;
+
+procedure TFormProperty.TextDropTargetUrlTextDrop(Text: String);
+begin
+  EditUrl.Text := Text;
+end;
+
+procedure TFormProperty.TextDropTargetTagTextDrop(Text: String);
+begin
+  EditTag.Text := Text;
+end;
+
+procedure TFormProperty.TextDropTargetTextTextDrop(Text: String);
+begin
+  MemoText.Text := Text;
+end;
+
+procedure TFormProperty.EditAddKeysKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+var s, KeyStr: string;
+begin   
+  if Key = 229 then Exit;
+  s := EditAddKeys.Text;
+  KeyStr := VKeyToKeyStr(Key);
+  s := s + KeyStr + ',';
+  EditAddKeys.Text := s;
+end;
+
+procedure TFormProperty.ButtonClearAddKeysClick(Sender: TObject);
+begin
+  EditAddKeys.Clear;
+  EditAddKeys.SetFocus;
+end;
+
+end.

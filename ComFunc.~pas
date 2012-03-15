@@ -1,0 +1,43 @@
+unit ComFunc;
+
+interface
+
+uses Windows, SysUtils, ComDef, ComItems, Menus;
+
+function GetNotSameItemSql(EditingItem: TCommonItem): string; 
+function KeyExsist(Cls: TItemClass; EditingItem: TCommonItem; sKey: string): Boolean; 
+function MouseItemExist(EditingItem: TCommonItem; Enable: Boolean;
+  MouseAction: TMouseAction; MouseKeyFlags: Integer; MouseRtnPoses: TMouseRtnPoses): Boolean;
+
+implementation     
+    
+function GetNotSameItemSql(EditingItem: TCommonItem): string;
+begin
+  Result := '';
+  if Assigned(EditingItem) then
+    Result := ' AND ( NOT (' +
+      CN_TABLE_ID + ' = ' + IntToStr(EditingItem.MyTableID) + ' AND ' +
+      CN_PARENT_ID + ' = ' + IntToStr(EditingItem.ID) + ' ))';
+end;
+
+function KeyExsist(Cls: TItemClass; EditingItem: TCommonItem; sKey: string): Boolean;
+begin
+  Result := Cls.RecordCount(
+    CN_KEY+'='+IntToStr(Word(TextToShortCut(sKey))) + ' AND ' +
+    CN_KEY + ' <> ' + '0' +
+    GetNotSameItemSql(EditingItem)) <> 0;
+//    DOutB(Result);
+end;
+
+function MouseItemExist(EditingItem: TCommonItem; Enable: Boolean;
+  MouseAction: TMouseAction; MouseKeyFlags: Integer; MouseRtnPoses: TMouseRtnPoses): Boolean;
+begin
+  Result := TMouseItem.RecordCount(
+      CN_ENABLED + ' = ' + IntToStr(Integer(Enable)) + ' AND ' +
+      CN_ACTION + ' = ' + IntToStr(Ord(MouseAction)) + ' AND ' +
+      CN_KEY_FLAGS + ' = ' + IntToStr(MouseKeyFlags) + ' AND ' +
+      CN_RTN_POSES + ' = ' + IntToStr(Word(MouseRtnPoses)) +
+      GetNotSameItemSql(EditingItem)) > 0;
+end;
+
+end.

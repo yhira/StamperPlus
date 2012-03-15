@@ -1,0 +1,112 @@
+procedure TCommonItem.SetMouseKeys(const Value: TMouseKeys);
+begin
+  FMouseKeys := Value;
+  if mkLBtn in FMouseKeys then FMouseKeyFlags := FMouseKeyFlags or MK_LBUTTON;
+  if mkMBtn in FMouseKeys then FMouseKeyFlags := FMouseKeyFlags or MK_MBUTTON;
+  if mkRBtn in FMouseKeys then FMouseKeyFlags := FMouseKeyFlags or MK_RBUTTON;
+  if mkCtrl in FMouseKeys then FMouseKeyFlags := FMouseKeyFlags or MK_CONTROL;
+  if mkShift in FMouseKeys then FMouseKeyFlags := FMouseKeyFlags or MK_SHIFT;
+end;
+
+procedure TCommonItem.SetMouseKeyFlags(const Value: Integer);
+begin
+  FMouseKeyFlags := Value;
+  if (FMouseKeyFlags and MK_LBUTTON) > 0 then FMouseKeys := FMouseKeys + [mkLBtn];
+  if (FMouseKeyFlags and MK_MBUTTON) > 0 then FMouseKeys := FMouseKeys + [mkMBtn];
+  if (FMouseKeyFlags and MK_RBUTTON) > 0 then FMouseKeys := FMouseKeys + [mkRBtn];
+  if (FMouseKeyFlags and MK_CONTROL) > 0 then FMouseKeys := FMouseKeys + [mkCtrl];
+  if (FMouseKeyFlags and MK_SHIFT)   > 0 then FMouseKeys := FMouseKeys + [mkShift];
+end;
+//  function GetActiveTree: TStnTreeView;
+//  begin
+//    case PageControlMain.ActivePageIndex of
+//      1: Result := TreePaste;
+//      2: Result := TreeLaunch;
+//      3: Result := TreeBkmk;
+////      4: Result := TreeClip;
+//    else Result := nil;
+//    end;
+//  end;
+//  function GetActiveList: TStnListView;
+//  begin
+//    case PageControlMain.ActivePageIndex of
+//      1: Result := ListViewPaste;
+//      2: Result := ListViewLaunch;
+//      3: Result := ListViewBkmk;
+//      4: Result := ListViewClip;
+//    else Result := ListViewAllSearch;
+//    end;
+//  end;
+
+               
+//  for i := 0 to DirIcons.Count-1 do begin
+//    ImageListDirS.AddIcon(TIconItem(DirIcons[i]).Icon);
+//    ImageListDirL.AddIcon(TIconItem(DirIcons[i]).Icon);
+//  end;
+//    FormProperty.ImageListS := ImageListDirS;
+//    FormProperty.ImageListL := ImageListDirL;
+
+//  ShowMessage('(' + IntToStr(IconGrid.Col) + ', ' +
+//    IntToStr(IconGrid.Row) + ')(' + IntToStr(IconGrid.ImageIndex) + ')');
+                    
+
+//  ii := TDirIconItem.Create;
+//  tb := SQLiteDB.GetTable('SELECT * FROM ' + TB_DIR_ICONS);
+//  tb.MoveFirst;
+//  while not tb.EOF do begin
+//    ii.SetFields(tb);
+//    ImageListDirS.AddIcon(ii.Icon);
+//    TreePaste.Items.Add(nil, IntToStr(tb.Row)).ImageIndex := tb.Row;
+//    tb.Next;
+//  end;
+//
+////  m := tb.FieldAsBlob(1);
+////  m.Position := 0;
+////  ii.Icon.LoadFromStream(m);
+//  tb.Free;
+//  ii.Free;
+
+//  l := TList.Create;
+//  SetDirIcons(l);
+
+
+//  for i := 0 to DirIcons.Count-1 do begin
+//    ImageListDirS.AddIcon(TIconItem(DirIcons[i]).Icon);
+//    TreePaste.Items.Add(nil, IntToStr(i)).ImageIndex := i;
+//  end;
+
+
+//  ClearList(l);
+//  l.Free;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
