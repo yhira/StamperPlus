@@ -297,7 +297,10 @@ begin
   if (Item is TPasteItem) or (Item is TClipItem) then begin
     MemoText.Text := (Item as TTextItem).Text;
     ComboPasteMode.ItemIndex := Integer((Item as TTextItem).Mode);
-  end;            
+  end;
+  if (Item is TPasteItem) then begin
+    EditAddKeys.Text := (Item as TPasteItem).AddKeys;
+  end;
   if Item is TBkmkItem then begin
     EditUrl.Text := (Item as TBkmkItem).Url;
   end;
@@ -361,6 +364,9 @@ begin
     (Item as TTextItem).Mode := TPasteMode(ComboPasteMode.ItemIndex);
     if Trim((Item as TTextItem).Name) = '' then
       (Item as TTextItem).Name := GetAvailablenessLine(MemoText.Text);
+  end;        
+  if (Item is TPasteItem) then begin
+    (Item as TPasteItem).AddKeys := EditAddKeys.Text;
   end;
   if Item is TBkmkItem then begin
     (Item as TBkmkItem).Url := EditUrl.Text;
